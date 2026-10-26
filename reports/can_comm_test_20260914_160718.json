@@ -1,0 +1,8 @@
+{
+  "adapter": "candleLight USB to CAN adapter (<DEVICE ID 1d50:606f on Bus 001 Address 006>)",
+  "serial": "003D002B4356510820333133",
+  "bitrate": 1000000,
+  "rx_frames": 0,
+  "ok": false,
+  "note": "no traffic; check wiring/termination/bitrate/GPS power"
+}

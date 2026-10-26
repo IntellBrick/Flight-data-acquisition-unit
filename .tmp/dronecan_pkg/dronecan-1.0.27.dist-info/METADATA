@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: dronecan
+Version: 1.0.27
+Summary: Python implementation of the DroneCAN protocol stack
+Author-email: Pavel Kirienko <uavcan@googlegroups.com>, Ben Dyer <ben_dyer@mac.com>
+Maintainer-email: Andrew Tridgell <andrew@tridgell.net>, Siddharth Purohit <sidbpurohit@gmail.com>
+Project-URL: Homepage, https://github.com/DroneCAN/pydronecan
+Project-URL: Issues, https://github.com/DroneCAN/pydronecan/issues
+Classifier: Development Status :: 6 - Mature
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Dynamic: license-file

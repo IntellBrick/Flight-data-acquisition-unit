@@ -1,0 +1,16 @@
+Metadata-Version: 2.1
+Name: pydronecan
+Version: 0.0
+Summary: Python implementation of the DroneCAN protocol stack
+Home-page: https://pypi.python.org/pypi/dronecan/
+Author: Pavel Kirienko, Ben Dyer
+Author-email: dronecan.devel@gmail.com
+Maintainer: UNKNOWN
+Maintainer-email: UNKNOWN
+License: UNKNOWN
+Platform: all
+Requires-Dist: dronecan
+
+Use `dronecan <https://pypi.python.org/pypi/dronecan/>`_ instead.
+
+

@@ -1,0 +1,110 @@
+{
+  "verdict": "PASS",
+  "exit_code": 0,
+  "port": "COM10",
+  "bitrate": 1000000,
+  "allocator_node_id": 100,
+  "allocation": {
+    "requests": 35,
+    "followups": 2,
+    "grants": 1,
+    "granted_node": 125,
+    "granted_unique_id": "47 00 07 00 0a 51 34 33 34 33 30 37 00 00 00 00",
+    "table": {
+      "470007000a5134333433303700000000": 125
+    }
+  },
+  "node_status": {
+    "125": {
+      "uptime_sec": 4024,
+      "health": "OK",
+      "health_code": 0,
+      "mode": "OPERATIONAL",
+      "mode_code": 0,
+      "sub_mode": 0,
+      "vssc": 0
+    }
+  },
+  "node_info": {
+    "status": {
+      "uptime_sec": 3994,
+      "health": "OK",
+      "mode": "OPERATIONAL"
+    },
+    "sw": "1.4",
+    "hw": "0.5",
+    "optional_field_flags": 3,
+    "vcs_commit": "24bff26b",
+    "image_crc": "0845c1fcc8f35252",
+    "unique_id": "47 00 07 00 0a 51 34 33 34 33 30 37 00 00 00 00",
+    "name": "net.cuav.neo-4-se"
+  },
+  "gnss": {
+    "count": 150,
+    "first": {
+      "msg": "Fix2",
+      "timestamp_us": 0,
+      "gnss_timestamp_us": 0,
+      "gnss_time_standard": "NONE",
+      "num_leap_seconds": 0,
+      "lon_deg": 0.0,
+      "lat_deg": 0.0,
+      "height_ellipsoid_m": 0.0,
+      "height_msl_m": -17.0,
+      "vel_n_mps": 0.0,
+      "vel_e_mps": 0.0,
+      "vel_d_mps": 0.0,
+      "sats_used": 0,
+      "status": "NO_FIX",
+      "mode": "SINGLE",
+      "sub_mode": 0,
+      "covariance": [
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN
+      ],
+      "pdop": 100.0
+    },
+    "last": {
+      "msg": "Fix2",
+      "timestamp_us": 0,
+      "gnss_timestamp_us": 0,
+      "gnss_time_standard": "NONE",
+      "num_leap_seconds": 0,
+      "lon_deg": 0.0,
+      "lat_deg": 0.0,
+      "height_ellipsoid_m": 0.0,
+      "height_msl_m": -17.0,
+      "vel_n_mps": 0.0,
+      "vel_e_mps": 0.0,
+      "vel_d_mps": 0.0,
+      "sats_used": 0,
+      "status": "NO_FIX",
+      "mode": "SINGLE",
+      "sub_mode": 0,
+      "covariance": [
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN,
+        NaN
+      ],
+      "pdop": 100.0
+    },
+    "position_lock": false
+  },
+  "message_counts": {
+    "node125/dtid1002": 2505,
+    "node125/dtid1061": 450,
+    "node125/dtid1063": 1500,
+    "node125/dtid20003": 150,
+    "node125/dtid341": 30
+  },
+  "frames": 4679,
+  "crc_failures": 0,
+  "raw_frame_log": "D:\\Lab\\Flight-data-acquisition-unit\\reports\\gps_alloc_test_20261013_163858_frames.log"
+}

@@ -1,0 +1,7 @@
+{
+  "port": "COM10",
+  "bitrate": 1000000,
+  "frames": 15,
+  "node_status": {},
+  "node_info": {}
+}
