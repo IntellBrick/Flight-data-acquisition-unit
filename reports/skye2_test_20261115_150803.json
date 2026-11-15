@@ -1,0 +1,79 @@
+{
+  "verdict": "PASS",
+  "exit_code": 0,
+  "port": "COM10",
+  "bitrate": 1000000,
+  "allocator_node_id": 100,
+  "allocation": {
+    "requests": 0,
+    "followups": 0,
+    "grants": 0,
+    "granted_node": null,
+    "granted_unique_id": null,
+    "table": {}
+  },
+  "node_status": {
+    "125": {
+      "uptime_sec": 1617,
+      "health": "OK",
+      "health_code": 0,
+      "mode": "OPERATIONAL",
+      "mode_code": 0,
+      "sub_mode": 0,
+      "vssc": 0
+    }
+  },
+  "node_info": {},
+  "data_type_info": {},
+  "air_data": {
+    "raw_air_data_count": 2019,
+    "last_raw_air_data": {
+      "msg": "RawAirData",
+      "flags": 0,
+      "static_pressure": NaN,
+      "differential_pressure": -9.152891159057617,
+      "static_pressure_sensor_temperature": NaN,
+      "differential_pressure_sensor_temperature": NaN,
+      "static_air_temperature": 319.75,
+      "pitot_temperature": 39.75,
+      "covariance": [],
+      "heater": [],
+      "ias_mps": null,
+      "pressure_alt_m": null
+    },
+    "static_pressure_msgs": 0,
+    "last_static_pressure": null,
+    "static_temperature_msgs": 0,
+    "last_static_temperature": null,
+    "hygrometer_msgs": 409,
+    "last_hygrometer": {
+      "msg": "Hygrometer",
+      "temperature": 313.0,
+      "temperature_c_if_kelvin": 39.85000000000002,
+      "humidity": 36.9375,
+      "sensor_id": 0
+    }
+  },
+  "message_rates": {
+    "341": {
+      "name": "uavcan.protocol.NodeStatus",
+      "frames": 41,
+      "hz": 1.0003003306881035
+    },
+    "1027": {
+      "name": "uavcan.equipment.air_data.RawAirData",
+      "frames": 6057,
+      "hz": 150.68676418736572
+    },
+    "1032": {
+      "name": "dronecan.sensors.hygrometer.Hygrometer",
+      "frames": 409,
+      "hz": 10.152011020351255
+    }
+  },
+  "frames": 6507,
+  "crc_failures": 0,
+  "raw_air_data_crc_free_fallbacks": 0,
+  "unknown_dtid_payloads": {},
+  "raw_frame_log": "D:\\Lab\\Flight-data-acquisition-unit\\reports\\skye2_test_20261115_150803_frames.log"
+}
