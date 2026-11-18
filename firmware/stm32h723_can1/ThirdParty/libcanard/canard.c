@@ -621,6 +621,7 @@ int16_t canardHandleRxFrame(CanardInstance* ins, const CanardCANFrame* frame, ui
             }
         }
 
+        /* 本工程按多帧首帧时间归属日志窗口，接收状态保存的时间即为首帧时间。 */
         CanardRxTransfer rx_transfer = {
             .timestamp_usec = rx_state->timestamp_usec,
             .payload_head = rx_state->buffer_head,

@@ -1,3 +1,7 @@
+/*
+ * PC/模拟器窗口回归测试的独立入口，使用内存中的 CAN 帧替代真实板级接口。
+ * 验证写卡积压回放、首帧归属和恰好达到重组截止时间时的迟到判定。
+ */
 #include <assert.h>
 #include <string.h>
 
@@ -6,7 +10,7 @@
 #include "nodes.h"
 #include "uavcan.equipment.gnss.Fix2.h"
 
-static const uint64_t service_time = 5850000;
+static const uint64_t service_time = 5850000; /* 模拟主循环到 5.85 秒才处理积压帧。 */
 static BoardCanFrame input[32];
 static unsigned input_next;
 static unsigned input_count;
@@ -42,6 +46,7 @@ void board_can_recover(void)
 {
 }
 
+/* 使用真实 libcanard 生成带 CRC 的多帧 Fix2，逐帧设置接收时间后排入输入队列。 */
 static void queue_fix(CanardInstance *sender, uint8_t *tid, uint64_t first_us, uint64_t last_us)
 {
     struct uavcan_equipment_gnss_Fix2 fix = {.sats_used = 5};
@@ -68,7 +73,9 @@ int main(void)
     canardSetLocalNodeID(&sender, GPS_NODE_ID);
 
     uint8_t tid = 0;
+    /* 第一条在 5.2 秒边界前开始、余量内结束，归入 [5.0, 5.2) 秒窗口。 */
     queue_fix(&sender, &tid, 5199700, 5203000);
+    /* 第二条末帧恰在 5.42 秒，达到 [5.2, 5.4) 秒窗口的封帧截止时间。 */
     queue_fix(&sender, &tid, 5399700, 5420000);
     acquisition_init(&records, 0);
     acquisition_service();
@@ -77,7 +84,7 @@ int main(void)
     assert(stats.gps_messages == 2 && stats.crc_errors == 0 && stats.dsdl_errors == 0);
     assert(records.count == 4 && records.gps_late == 1);
     const uint8_t *first = log_peek(&records, 0);
-    // Offset 199700 us, received NO_FIX, five satellites, position invalid.
+    /* 偏移 199700 微秒，收到 NO_FIX 和 5 颗卫星，位置有效位为 0。 */
     const uint8_t offset[] = {0x14, 0x0C, 0x03, 0};
     assert(memcmp(first + 20, offset, sizeof offset) == 0);
     assert(first[64] == GPS_NODE_ID && first[65] == 0 && first[66] == 5 && first[68] == 1);

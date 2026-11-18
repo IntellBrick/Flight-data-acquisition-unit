@@ -3176,6 +3176,7 @@ static uint32_t SD_PowerON(SD_HandleTypeDef *hsd)
   }
   /* SD CARD */
   /* Send ACMD41 SD_APP_OP_COND with Argument 0x80100000 */
+  /* 为 ACMD41 上电协商增加总等待时限，故障卡可退出挂载并恢复主循环服务。 */
   uint32_t voltage_start = HAL_GetTick();
   while ((count < SDMMC_MAX_VOLT_TRIAL) && (validvoltage == 0U))
   {

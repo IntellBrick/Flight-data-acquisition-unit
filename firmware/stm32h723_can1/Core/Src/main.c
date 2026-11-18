@@ -1,3 +1,8 @@
+/*
+ * 固件的 C 语言入口。
+ * 启动文件完成供电、内核和 C 运行库初始化后进入 main()。
+ * 裸机主循环依次服务 CAN、停止请求、写卡和串口诊断，中断负责及时保存原始帧。
+ */
 #include "acquisition.h"
 #include "board.h"
 #include "sd_log.h"
@@ -5,8 +10,10 @@
 #include <inttypes.h>
 #include <stdio.h>
 
+/* 静态存储在进入 main() 前清零，集中保存窗口、日志队列和累计统计。 */
 static LogRecords records;
 
+/* 每秒输出采集、总线、存储三组诊断，便于串口观察缺样和故障恢复。 */
 static void report_status(void)
 {
     const AcquisitionStats acq = acquisition_stats();
@@ -43,7 +50,9 @@ static void report_status(void)
 
 int main(void)
 {
+    /* 先启动 HAL、系统时钟、微秒时钟和串口，使协议栈可以取得本地时间。 */
     board_init();
+    /* 注册完整报文回调、接收筛选函数和主控节点 ID，再开放 CAN 接收。 */
     acquisition_init(&records, board_time_us());
     board_can_start();
     board_uart_write("FDAU CAN1 1 Mbit/s | send s to drain and close the log\r\n");
@@ -51,12 +60,15 @@ int main(void)
     uint64_t report_at = 0;
     bool stopping = false;
     for (;;) {
+        /* 优先回放接收队列，按各帧原始接收时间解码并推进记录窗口。 */
         acquisition_service();
         if (!stopping && board_stop_requested()) {
+            /* s/S 只触发一次停录，后续循环继续将已封帧记录写完并关闭文件。 */
             stopping = true;
             acquisition_stop();
         }
         sd_log_service(&records, stopping);
+        /* 诊断使用当前时间调度，串口输出为带超时的轮询发送。 */
         uint64_t now = board_time_us();
         if (now >= report_at) {
             report_at = now + 1000000U;

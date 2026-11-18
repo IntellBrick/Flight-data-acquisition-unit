@@ -1,4 +1,4 @@
-"""Validate an FDAULOG v1 binary file and stream its valid records to CSV."""
+"""校验 FDAULOG v1 二进制日志，并将通过 CRC 的完整记录流式导出为 CSV。"""
 
 import argparse
 import csv
@@ -11,6 +11,7 @@ from pathlib import Path
 MAGIC = b"FDAULOG\0"
 VERSION = 1
 PERIOD_US = 200_000
+# 小端文件头固定 16 字节，记录固定 80 字节，x 表示跳过保留字节。
 HEADER = struct.Struct("<8sHHI")
 RECORD = struct.Struct("<QI fBB2x Iqqi fff QBBBBB3x II")
 FIELDS = (
@@ -22,6 +23,7 @@ FIELDS = (
 
 
 def read_header(source):
+    """检查 magic、格式版本、记录大小和采样周期，成功后文件位置停在第一帧。"""
     raw = source.read(HEADER.size)
     if len(raw) != HEADER.size:
         raise ValueError(f"incomplete file header ({len(raw)} bytes)")
@@ -33,6 +35,7 @@ def read_header(source):
 
 
 def export_records(source, output, diagnostics):
+    """逐帧校验并导出，异常诊断与 CSV 分别写入独立输出流。"""
     writer = csv.DictWriter(output, fieldnames=FIELDS, lineterminator="\n")
     writer.writeheader()
     offset = HEADER.size
@@ -42,6 +45,7 @@ def export_records(source, output, diagnostics):
         if len(raw) != RECORD.size:
             print(f"offset {offset}: ignored {len(raw)} trailing bytes", file=diagnostics)
             break
+        # 按固定帧边界前进，损坏整帧跳过，末尾不完整记录忽略并报告长度。
         values = RECORD.unpack(raw)
         crc = zlib.crc32(raw[:-4])
         if crc != values[-1]:
@@ -56,6 +60,7 @@ def export_records(source, output, diagnostics):
         time_us = row["frame_time_us"]
         if previous is not None:
             prev_seq, prev_time_us = previous
+            # 序号按 uint32 回绕计算，同时核对时间差是否与窗口数量一致。
             delta = (sequence - prev_seq) & 0xFFFFFFFF
             if delta == 0 or time_us <= prev_time_us:
                 print(f"offset {offset}: non-increasing time or repeated sequence ({prev_seq} -> {sequence})",
@@ -72,6 +77,7 @@ def export_records(source, output, diagnostics):
         previous = sequence, time_us
         offset += RECORD.size
 
+        # 有效位决定 CSV 是否留空，合法的 0 偏移、0 压差和负压差均保留。
         air_flags = row["air_flags"]
         gps_flags = row["gps_flags"]
         if not air_flags & 1:
@@ -94,6 +100,7 @@ def export_records(source, output, diagnostics):
 
 
 def main(argv=None):
+    """命令行入口，先验证输入文件头，再创建 CSV 输出，诊断信息写到 stderr。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="FDAULOG v1 .BIN file")
     parser.add_argument("-o", "--output", type=Path, help="CSV path (defaults to stdout)")

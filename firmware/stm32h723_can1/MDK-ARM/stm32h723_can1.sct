@@ -1,9 +1,11 @@
+; 链接布局将向量表和只读代码放在 1 MiB 内部 Flash 起点。
 LR_FLASH 0x08000000 0x00100000 {
   ER_FLASH 0x08000000 0x00100000 {
     *.o (RESET, +First)
     *(InRoot$$Sections)
     .ANY (+RO)
   }
+  ; 可写数据、静态队列、栈和堆放在 320 KiB AXI SRAM。
   RW_AXI 0x24000000 0x00050000 {
     .ANY (+RW +ZI)
   }

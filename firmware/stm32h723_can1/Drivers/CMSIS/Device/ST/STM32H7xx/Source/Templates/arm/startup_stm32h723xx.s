@@ -245,6 +245,9 @@ __Vectors_Size  EQU  __Vectors_End - __Vectors
 
                 AREA    |.text|, CODE, READONLY
 
+; 复位入口先稳定供电并初始化内核，再跳入 C 运行库 __main。
+; __main 按链接布局复制已初始化数据、清零静态区，最终调用 Core/Src/main.c 的 main()。
+; 中断向量表中的弱处理函数由 board.c 内同名的 IRQ 函数覆盖。
 ; Reset handler
 Reset_Handler    PROC
                  EXPORT  Reset_Handler                    [WEAK]

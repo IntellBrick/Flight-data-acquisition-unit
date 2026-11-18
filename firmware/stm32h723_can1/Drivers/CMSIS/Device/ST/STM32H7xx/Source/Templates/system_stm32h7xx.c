@@ -179,6 +179,8 @@
   */
 void SystemInit (void)
 {
+  /* 启动汇编在 C 运行库初始化前调用这里，完成 FPU 和 RCC 基础状态设置。
+   * 工程的 HSE/PLL 和外设最终时钟由 main() -> board_init() -> clock_init() 配置。 */
 #if defined (DATA_IN_D2_SRAM)
  __IO uint32_t tmpreg;
 #endif /* DATA_IN_D2_SRAM */
@@ -466,6 +468,7 @@ void SystemCoreClockUpdate (void)
   */
 void ExitRun0Mode(void)
 {
+  /* 本工程定义 USE_PWR_LDO_SUPPLY，复位入口首先选择 LDO 并等待供电稳定。 */
 #if defined(USE_PWR_LDO_SUPPLY)
   #if defined(SMPS)
     /* Exit Run* mode by disabling SMPS and enabling LDO */

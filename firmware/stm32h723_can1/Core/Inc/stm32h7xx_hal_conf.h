@@ -35,7 +35,7 @@
   */
 #define HAL_MODULE_ENABLED
 
-/* Keep SD command and internal initialization waits bounded on this board. */
+/* 本工程为 SD 命令、内部数据等待和 ACMD41 协商设置有限超时，单位毫秒。 */
 #define SDMMC_CMDTIMEOUT (300U)
 #define SDMMC_SWDATATIMEOUT (1200U)
 /* #define HAL_ADC_MODULE_ENABLED */
@@ -49,6 +49,7 @@
 /* #define HAL_DCMI_MODULE_ENABLED */
 /* #define HAL_DFSDM_MODULE_ENABLED */
 #define HAL_DMA_MODULE_ENABLED
+/* DMA 驱动为 HAL 依赖提供符号，当前 SD 卡数据路径使用轮询块读写。 */
 /* #define HAL_DMA2D_MODULE_ENABLED */
 /* #define HAL_DTS_MODULE_ENABLED */
 /* #define HAL_DSI_MODULE_ENABLED */

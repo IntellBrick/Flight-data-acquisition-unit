@@ -2,6 +2,8 @@
 
 本工程记录 CAN1 上一台 NEO 4SE 和一台 SKYE2 的数据。节点配置分别为 GPS 125、空速计 124、主控 100。更换传感器时，在 [acquisition.c](App/acquisition.c) 中更新对应的 16 字节 UID。
 
+启动顺序、主循环、数据流和各源码文件职责见[中文代码说明](../../docs/can1_sd_logging_code_guide.md)。
+
 ## 构建与上板
 
 1. 在 Keil µVision 5 中打开 [stm32h723_can1.uvprojx](MDK-ARM/stm32h723_can1.uvprojx)，选择 Arm Compiler 6。工程使用 STM32H723VGTx 和相对路径，源码依赖已随工程提供。

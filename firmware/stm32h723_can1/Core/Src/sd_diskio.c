@@ -1,3 +1,7 @@
+/*
+ * FatFs 与 HAL SDMMC1 的适配层。
+ * FatFs 通过 disk_* 接口读写 512 字节逻辑扇区，本文件使用有超时的 HAL 轮询操作。
+ */
 #include <stdbool.h>
 #include <string.h>
 
@@ -5,9 +9,9 @@
 #include "ff.h"
 #include "diskio.h"
 
-#define SECTOR_SIZE 512U
-#define SECTORS_PER_IO 8U
-#define SD_TIMEOUT_MS 300U
+#define SECTOR_SIZE 512U      /* 与 ffconf.h 中 FF_MIN_SS、FF_MAX_SS 一致。 */
+#define SECTORS_PER_IO 8U     /* 单次 HAL 数据操作最多 4 KiB。 */
+#define SD_TIMEOUT_MS 300U   /* 数据传输和卡就绪轮询各自的超时，单位毫秒。 */
 
 static SD_HandleTypeDef sd = {
     .Instance = SDMMC1,
@@ -16,12 +20,14 @@ static SD_HandleTypeDef sd = {
         .ClockPowerSave = SDMMC_CLOCK_POWER_SAVE_DISABLE,
         .BusWide = SDMMC_BUS_WIDE_4B,
         .HardwareFlowControl = SDMMC_HARDWARE_FLOW_CONTROL_ENABLE,
-        .ClockDiv = 4, // PLL1Q = 100 MHz, SD clock = 12.5 MHz.
+        .ClockDiv = 4, /* 正常卡时钟为 PLL1Q / (2 × 4)，即 12.5 MHz。 */
     },
 };
 static DSTATUS status = STA_NOINIT;
+/* 四字节对齐的中转缓冲，适配 FatFs 可能传入的未对齐指针。 */
 static _Alignas(4) uint8_t buffer[SECTOR_SIZE * SECTORS_PER_IO];
 
+/* HAL 块写返回后仍需等卡退出忙状态，CTRL_SYNC 也复用这一步。 */
 static bool card_ready(void)
 {
     uint32_t start = HAL_GetTick();
@@ -38,6 +44,7 @@ static bool card_ready(void)
     return false;
 }
 
+/* 首次挂载或故障重挂载时初始化卡，仅接受逻辑设备号 0。 */
 DSTATUS disk_initialize(BYTE drive)
 {
     if (drive != 0) {
@@ -53,11 +60,13 @@ DSTATUS disk_initialize(BYTE drive)
     return status;
 }
 
+/* 返回最近一次初始化/读写维护的状态，卡状态由实际 I/O 进一步确认。 */
 DSTATUS disk_status(BYTE drive)
 {
     return drive == 0 ? status : STA_NOINIT;
 }
 
+/* read_out 与 write_in 由读写入口二选一提供，大请求分为最多八扇区一组。 */
 static DRESULT transfer(BYTE drive, BYTE *read_out, const BYTE *write_in, LBA_t sector, UINT count)
 {
     if (drive != 0 || count == 0) {
@@ -95,16 +104,19 @@ static DRESULT transfer(BYTE drive, BYTE *read_out, const BYTE *write_in, LBA_t 
     return RES_OK;
 }
 
+/* FatFs 的扇区读取入口，数据经过对齐缓冲后复制到调用者。 */
 DRESULT disk_read(BYTE drive, BYTE *out, LBA_t sector, UINT count)
 {
     return transfer(drive, out, NULL, sector, count);
 }
 
+/* FatFs 的扇区写入入口，每组数据写完后确认卡已可继续接收命令。 */
 DRESULT disk_write(BYTE drive, const BYTE *in, LBA_t sector, UINT count)
 {
     return transfer(drive, NULL, in, sector, count);
 }
 
+/* 提供同步、容量、扇区大小及块大小查询，CTRL_SYNC 与文件同步链路关联。 */
 DRESULT disk_ioctl(BYTE drive, BYTE command, void *out)
 {
     if (drive != 0) {

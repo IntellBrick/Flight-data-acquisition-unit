@@ -360,6 +360,7 @@ typedef struct
 #define SDMMC_CCCC_ERASE                   ((uint32_t)0x00000020U)
 
 #ifndef SDMMC_CMDTIMEOUT
+/* 允许板级 HAL 配置覆盖默认命令超时，本工程在 hal_conf.h 中设为 300 ms。 */
 #define SDMMC_CMDTIMEOUT                   ((uint32_t)5000U)        /* Command send and response timeout     */
 #endif
 #define SDMMC_MAXERASETIMEOUT              ((uint32_t)63000U)       /* Max erase Timeout 63 s                */

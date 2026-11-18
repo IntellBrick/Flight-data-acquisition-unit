@@ -1,3 +1,4 @@
+/* 主控与两个传感器的节点 ID，UID 对照表在 acquisition.c 中定义。 */
 #ifndef NODES_H
 #define NODES_H
 
