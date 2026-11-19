@@ -21,8 +21,10 @@ flowchart TD
     CAN --> Loop["主循环"]
     Loop --> Service["acquisition_service() 解码、节点管理、组帧、发送"]
     Service --> Stop["检查串口 s/S 停止请求"]
-    Stop --> SD["sd_log_service() 挂载、写入、同步、关闭"]
-    SD --> Report["到诊断时刻则 report_status()"]
+    Stop --> LEDBefore["update_leds() 发布状态快照"]
+    LEDBefore --> SD["sd_log_service() 挂载、写入、同步、关闭"]
+    SD --> LEDAfter["update_leds() 发布写卡后状态"]
+    LEDAfter --> Report["到诊断时刻则 report_status()"]
     Report --> Loop
     Interrupt["CAN 接收中断"] --> Queue["时间戳和原始帧进入 1024 帧队列"]
     Queue -.-> Service
@@ -58,7 +60,7 @@ flowchart TD
 
 | 顺序 | 调用 | 完成的工作 |
 | --- | --- | --- |
-| 1 | `board_init()` | 依次调用 `HAL_Init()`、`clock_init()`、`timer_init()`、`uart_init()` |
+| 1 | `board_init()` | 配置 LED GPIO，再依次调用 `HAL_Init()`、`clock_init()`、`timer_init()`、`uart_init()` |
 | 2 | `acquisition_init(&records, board_time_us())` | 保存共享日志对象，初始化 4 KiB libcanard 内存池、回调和主控 ID 100，记录启动等待基准 |
 | 3 | `board_can_start()` | 配置 PD0/PD1、CAN 位时序、硬件过滤器、FIFO 和中断，启动 FDCAN1 |
 | 4 | `board_uart_write(...)` | 输出启动提示以及串口停止命令说明 |
@@ -76,6 +78,8 @@ flowchart TD
 | `uart_init()` | USART1，PA9/PA10，115200 8N1 | 串口诊断和接收 s/S 命令 |
 
 SDMMC 的引脚和时钟在首次实际初始化卡时，由 HAL 调用 `HAL_SD_MspInit()` 配置。日志队列出现首帧后，写卡状态机才开始挂载。
+
+在 HAL 初始化之前，`board_init()` 先配置两个 LED GPIO 并常亮。TIM2 启动后开启 SysTick 中的 LED 时序服务，使用微秒时钟计算亮灭截止时间。
 
 关键初始化函数经过 `require()` 检查，失败时关闭中断并停在循环内，可通过 Keil 调用栈定位失败位置。
 
@@ -123,7 +127,7 @@ SDMMC 的引脚和时钟在首次实际初始化卡时，由 HAL 调用 `HAL_SD_
 - 最早记录的计划封帧时刻已经过去约 1 秒。
 - 已收到停止请求，需要排空队列。
 
-单次打包最多 51 个完整帧，共 4080 字节，使用 4 KiB 缓冲。`f_write()` 返回后同时检查返回值和写入长度。每约 2 秒有未同步记录时执行 `f_sync()`。停止且队列为空时执行 `f_close()`，成功后状态变为 CLOSED。
+单次打包最多 51 个完整帧，共 4080 字节，使用 4 KiB 缓冲。`f_write()` 返回后同时检查返回值和写入长度，并返回主循环更新 LED 快照。下一轮再按条件执行同步或关闭。每约 2 秒有未同步记录时执行 `f_sync()`。停止且队列为空时执行 `f_close()`，成功后状态变为 CLOSED。
 
 `after_io()` 统计单次文件操作耗时，并立即调用 `acquisition_service()`。因此 `f_write()` 与后续 `f_sync()` 之间也有 CAN 服务机会。文件操作自身仍为同步调用，期间接收中断可以继续往原始帧队列入队。
 
@@ -233,7 +237,12 @@ SDMMC 底层按最多八扇区分组进行轮询块读写，数据操作和卡�
 | `App/log_record.h` | `AirSample`、`GpsSample`、`LogWindow`、`LogRecords` | 定义采样单位、窗口状态、文件格式常量、日志队列和接口 |
 | `App/sd_log.c` | `sd_log_service()`、`open_file_step()`、`write_batch()` | 分步建文件、批量写入、周期同步、故障重挂载和关闭 |
 | `App/sd_log.h` | `SdLogState`、`SdLogOperation`、`SdLogStats` | 写卡公开状态、故障操作类别、统计和接口 |
+| `App/status_led.c` | `status_led_prepare()`、`status_led_tick()` | 就绪条件和有效期快照、LED1 快慢闪相位、LED2 UTC 边界报时及时间跳变处理 |
+| `App/status_led.h` | `StatusLedSnapshot`、`StatusLedController`、`StatusLedOutput` | 主循环到 SysTick 的快照、时序状态和逻辑灯光输出定义 |
 | `tests/test_can1_windows.c` | 独立的测试 `main()` 和板级替身 | 在内存中构造多帧 Fix2，验证跨界首帧归属和截止时刻迟到，供 PC 或模拟器执行 |
+| `tests/test_status_led.c` | LED 确定性时序测试 | 验证快慢闪、单闪双闪、相位保持、授时超时、跳时和主循环停顿 |
+| `tests/test_acquisition_status.c` | DroneCAN 状态集成测试 | 验证运行心跳、完整报文就绪、UTC/TAI/GPS 换算、未知时标/闰秒、重启和离线 |
+| `tests/test_sd_led_status.c` | FatFs 替身测试 | 验证首次写数据、同步失败、短写、重挂载与关闭时的写卡就绪状态 |
 | `tools/decode_sd_log.py`（相对仓库根目录） | `main()`、`read_header()`、`export_records()` | 校验文件头、逐帧 CRC、序号与时间连续性，流式生成 CSV |
 
 ### 6.2 libcanard 和 FatFs
@@ -362,3 +371,33 @@ python tools/decode_sd_log.py E:/LOG0001.BIN -o LOG0001.csv
 | 故障发生在哪一层 | `storage_fault()` | op、result、short_write |
 
 在接收中断或主循环中长时间停在断点会改变接收积压与分配时限，连续采集质量可结合运行时串口统计观察。
+
+## 10. 两颗 LED 的执行链路
+
+逻辑 LED1 使用 PA15，对应板级原理图的 LED2；逻辑 LED2 使用 PD15，对应原理图的 LED3，均低电平点亮。原理图 LED1 是固定电源指示灯。
+
+`main.c` 的 `update_leds()` 在采集服务与停止请求处理后、写卡服务返回后各执行一次。它读取 `acquisition_status()`、`records.collecting` 和 `sd_log_stats()`，通过 `status_led_prepare()` 生成快照，再调用 `board_led_update()` 在短临界区中发布。文件写入返回主循环后先更新快照，下一轮才继续同步或关闭。
+
+`SysTick_Handler()` 每毫秒在更新 HAL 时基后，读取快照和 `board_time_us()`，执行 `status_led_tick()` 并设置两个 GPIO。即使主循环在等待 TF 卡，SysTick 仍按绝对截止时间处理灯光。
+
+| 逻辑灯 | 条件 | 输出 |
+| --- | --- | --- |
+| LED1 | 任一节点离线、心跳模式非 Operational、无完整报文、报文已满 1 秒、未开始记录或当前文件尚无成功数据写入 | 常亮 |
+| LED1 | 两节点就绪且正在成功记录，GPS 未达到 3D_FIX 或卫星数少于 6 | 亮 250 ms、灭 250 ms，周期 500 ms |
+| LED1 | 两节点就绪且正在成功记录，GPS 为 3D_FIX 且卫星数至少 6 | 亮 250 ms、灭 1750 ms，周期 2000 ms |
+| LED2 | 尚无有效授时、有效授时已满 1 秒、GPS 重启或离线 | 常亮 |
+| LED2 | 有效 UTC 时间到达下一整分边界 | 亮 500 ms 一次 |
+| LED2 | 有效 UTC 时间到达下一半分边界 | 亮 500 ms、灭 500 ms、再亮 500 ms |
+| LED2 | 授时有效且没有报时事件 | 熄灭 |
+
+就绪状态使用每条解码成功的完整传感器报文，空速第 1 条即可提供状态输入。GPS 定位和卫星数也使用最新完整 Fix2，独立于日志窗口中选中的候选。
+
+`gps_time_utc()` 根据 Fix2 定义换算授时，UTC 直接使用，TAI 减去 `num_leap_seconds + 10` 秒，GPS 减去 `num_leap_seconds - 9` 秒。零时间、未知时标、换算所需闰秒未知或换算结果非法时保留上一次有效锚点，并由其原有的 1 秒有效期决定超时。
+
+控制器用 UTC 锚点与本地单调时钟推算未来 00/30 秒边界，按 UTC 事件时间去重。初次获得授时、超时恢复、GPS 状态代次改变或校时跳变达到 1 秒时，取消正在播放的脉冲并安排下一未来边界。小幅校时跨过边界时按估计边界本地时刻计算剩余脉冲，已触发事件不会重播。
+
+时间快照带有 `time_generation`。GPS 重启、离线、重新分配会递增该值，即使主循环在一次积压回放中又获得了新授时，SysTick 也能识别旧报时状态需要取消。
+
+主循环只在 LED1 模式改变时重置闪烁相位，同一模式下重复发布快照会延续相位。TF 卡故障时清除 `data_written`；恢复创建新文件后，文件头写入与同步完成仍保持等待，直到完整数据批次成功写入才允许 LED1 闪烁。
+
+授时指示的边界由 Fix2 接收时间和本地时钟推算，实际对时精度包含设备发送及总线接收延迟。板上脉宽与周期可通过示波器或逻辑分析仪核验。

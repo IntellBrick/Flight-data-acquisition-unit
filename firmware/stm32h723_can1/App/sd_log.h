@@ -27,6 +27,7 @@ typedef struct {
     SdLogOperation failed_op; /* 最近一次故障的阶段，恢复后保留供诊断。 */
     FRESULT last_error;       /* 最近一次故障的 FatFs 返回值。 */
     bool short_write;        /* FR_OK 但实际写入少于请求字节数。 */
+    bool data_written;       /* 当前文件至少成功写入一个完整数据批次。 */
     unsigned file_number;
     uint32_t failures;
     uint32_t uncertain_records; /* 故障时尚未确认同步成功的累计记录数。 */

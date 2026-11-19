@@ -43,6 +43,7 @@ static void after_io(uint64_t start, uint64_t *max_us)
 static void storage_fault(SdLogOperation op, FRESULT result, bool short_write)
 {
     stats.state = SD_LOG_FAULT;
+    stats.data_written = false;
     stats.failed_op = op;
     stats.last_error = result;
     stats.short_write = short_write;
@@ -105,6 +106,7 @@ static void open_file_step(void)
             next_file = file_number == LAST_FILE_NUMBER ? 1 : file_number + 1;
         }
         if (result == FR_OK) {
+            stats.data_written = false;
             stats.file_number = file_number;
             open_step = SD_OP_HEADER;
         } else if (result != FR_EXIST) {
@@ -154,6 +156,7 @@ static bool write_batch(LogRecords *log)
         storage_fault(SD_OP_WRITE, result, result == FR_OK);
         return false;
     }
+    stats.data_written = true;
     return true;
 }
 
@@ -191,6 +194,8 @@ void sd_log_service(LogRecords *log, bool stop_requested)
         if (!write_batch(log)) {
             return;
         }
+        /* 返回主循环发布最新传感器/写卡状态，再开始下一次同步或关闭操作。 */
+        return;
     }
     if (acquisition_allocation_pending()) {
         return;

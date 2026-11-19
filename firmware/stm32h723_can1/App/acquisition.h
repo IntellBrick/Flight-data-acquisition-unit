@@ -18,6 +18,26 @@ typedef struct {
     bool air_online;
 } AcquisitionStats;
 
+/* 状态灯使用实时完整报文状态，独立于日志候选及抽取计数。 */
+typedef struct {
+    uint64_t heartbeat_us;
+    uint64_t sample_us;
+    uint8_t mode;
+    bool online;
+    bool has_sample;
+} AcquisitionNodeStatus;
+
+typedef struct {
+    AcquisitionNodeStatus gps;
+    AcquisitionNodeStatus air;
+    uint64_t utc_us;
+    uint64_t time_received_us;
+    uint32_t time_generation; /* GPS 重启/掉线/重新分配时递增，取消旧报时脉冲。 */
+    uint8_t fix_status;
+    uint8_t satellites;
+    bool has_time;
+} AcquisitionStatus;
+
 /* 初始化一次，log 指向整个启动期间共享的静态日志对象。 */
 void acquisition_init(LogRecords *log, uint64_t start_us);
 /* 排空接收队列、推进窗口、发布心跳并尝试排空发送队列。 */
@@ -25,6 +45,7 @@ void acquisition_service(void);
 /* 写卡服务用它判断当前是否需要优先处理节点分配应答。 */
 bool acquisition_allocation_pending(void);
 AcquisitionStats acquisition_stats(void);
+AcquisitionStatus acquisition_status(void);
 void acquisition_stop(void); /* 停止新窗口组帧，保留已封帧队列供写卡服务排空。 */
 
 #endif

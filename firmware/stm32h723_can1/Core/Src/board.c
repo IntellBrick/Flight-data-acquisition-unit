@@ -29,6 +29,42 @@ static volatile uint32_t rx_tail; /* 累计读取位置，与 head 的差为当�
 static volatile BoardCanStats can_stats;
 static volatile uint32_t timer_wraps; /* TIM2 的高 32 位，由更新中断累计。 */
 static volatile bool bus_off;
+static volatile bool led_timer_ready;
+static volatile StatusLedSnapshot led_snapshot;
+static StatusLedController led_controller;
+
+static void led_write(StatusLedOutput output)
+{
+    /* 原理图 LED2/LED3 分别作为逻辑 LED1/LED2，接 3.3V 经限流电阻。 */
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, output.sensor_on ? GPIO_PIN_RESET : GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, output.time_on ? GPIO_PIN_RESET : GPIO_PIN_SET);
+}
+
+static void led_init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    /* 先设置输出锁存值，再改为推挽输出，启动阶段两灯常亮。 */
+    led_write((StatusLedOutput){.sensor_on = true, .time_on = true});
+    GPIO_InitTypeDef pins = {
+        .Pin = GPIO_PIN_15,
+        .Mode = GPIO_MODE_OUTPUT_PP,
+        .Pull = GPIO_NOPULL,
+        .Speed = GPIO_SPEED_FREQ_LOW,
+    };
+    HAL_GPIO_Init(GPIOA, &pins);
+    HAL_GPIO_Init(GPIOD, &pins);
+}
+
+void board_led_update(const StatusLedSnapshot *snapshot)
+{
+    /* 发布的是准备好的快照，换算和协议处理都在主循环中完成。 */
+    uint32_t mask = __get_PRIMASK();
+    __disable_irq();
+    led_snapshot = *snapshot;
+    __DMB();
+    __set_PRIMASK(mask);
+}
 
 /* 板级关键初始化失败时停在此处，可在 Keil 中检查调用栈定位外设。 */
 static void require(HAL_StatusTypeDef result)
@@ -130,10 +166,12 @@ static void uart_init(void)
 
 void board_init(void)
 {
+    led_init();
     /* HAL_Init() 启动 SysTick，之后的 HAL 超时使用毫秒计时。 */
     require(HAL_Init());
     clock_init();
     timer_init();
+    led_timer_ready = true;
     uart_init();
 }
 
@@ -409,4 +447,8 @@ void FDCAN1_IT0_IRQHandler(void)
 void SysTick_Handler(void)
 {
     HAL_IncTick();
+    if (led_timer_ready) {
+        StatusLedSnapshot snapshot = led_snapshot;
+        led_write(status_led_tick(&led_controller, &snapshot, board_time_us()));
+    }
 }

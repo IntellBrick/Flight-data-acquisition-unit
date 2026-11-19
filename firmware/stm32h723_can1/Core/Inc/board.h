@@ -3,6 +3,7 @@
 #define BOARD_H
 
 #include "canard.h"
+#include "status_led.h"
 
 typedef struct {
     CanardCANFrame frame;
@@ -27,5 +28,7 @@ void board_can_recover(void);
 BoardCanStats board_can_stats(void);
 bool board_stop_requested(void); /* 消费串口接收字符并检查 s/S。 */
 void board_uart_write(const char *text);
+/* 主循环发布状态，SysTick 消费；逻辑 LED1=PA15、LED2=PD15，均低电平亮。 */
+void board_led_update(const StatusLedSnapshot *snapshot);
 
 #endif

@@ -13,6 +13,16 @@
 /* 静态存储在进入 main() 前清零，集中保存窗口、日志队列和累计统计。 */
 static LogRecords records;
 
+/* 文件操作期间 SysTick 仍按最后快照的有效期控制 LED。 */
+static void update_leds(void)
+{
+    AcquisitionStatus acquisition = acquisition_status();
+    const SdLogStats *storage = sd_log_stats();
+    StatusLedSnapshot snapshot = status_led_prepare(&acquisition, records.collecting,
+                                                   storage->state == SD_LOG_OPEN && storage->data_written);
+    board_led_update(&snapshot);
+}
+
 /* 每秒输出采集、总线、存储三组诊断，便于串口观察缺样和故障恢复。 */
 static void report_status(void)
 {
@@ -67,7 +77,9 @@ int main(void)
             stopping = true;
             acquisition_stop();
         }
+        update_leds();
         sd_log_service(&records, stopping);
+        update_leds();
         /* 诊断使用当前时间调度，串口输出为带超时的轮询发送。 */
         uint64_t now = board_time_us();
         if (now >= report_at) {

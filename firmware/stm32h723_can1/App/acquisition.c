@@ -52,6 +52,7 @@ static CanardInstance canard;
 static _Alignas(8) uint8_t canard_pool[4096]; /* libcanard 的重组和发送固定内存池。 */
 static LogRecords *records;
 static AcquisitionStats stats;
+static AcquisitionStatus live_status;
 static uint64_t can_start_us;
 static uint64_t last_cleanup;
 static uint64_t next_heartbeat;
@@ -70,9 +71,15 @@ static void reset_samples(Node *node, uint64_t time_us)
 {
     node->reset_at = time_us;
     if (node == &air) {
+        live_status.air.has_sample = false;
         air_decimation = 0;
         log_reset_air(records);
     } else {
+        live_status.gps.has_sample = false;
+        live_status.has_time = false;
+        ++live_status.time_generation;
+        live_status.fix_status = 0;
+        live_status.satellites = 0;
         log_reset_gps(records);
     }
 }
@@ -237,6 +244,8 @@ static void handle_heartbeat(const CanardRxTransfer *transfer)
     node->last_heartbeat = received_us;
     node->has_heartbeat = true;
     node->online = true;
+    AcquisitionNodeStatus *live = node == &air ? &live_status.air : &live_status.gps;
+    live->mode = status.mode;
     start_if_ready(received_us);
 }
 
@@ -251,6 +260,8 @@ static void handle_air(const CanardRxTransfer *transfer)
     if (transfer->timestamp_usec < air.reset_at) {
         return;
     }
+    live_status.air.sample_us = transfer->timestamp_usec;
+    live_status.air.has_sample = true;
     /* NaN 压差也参与完整报文计数，测量有效性在日志编码时单独判定。 */
     if (++air_decimation == AIR_DECIMATION) {
         air_decimation = 0;
@@ -261,6 +272,44 @@ static void handle_air(const CanardRxTransfer *transfer)
         };
         log_add_air(records, &sample);
     }
+}
+
+/* 按 Fix2 的定义统一到 UTC，未知时标/闰秒不替换上一次有效授时。 */
+static bool gps_time_utc(const struct uavcan_equipment_gnss_Fix2 *message, uint64_t *utc_us)
+{
+    uint64_t raw = message->gnss_timestamp.usec;
+    if (raw == 0) {
+        return false;
+    }
+    int offset = 0;
+    switch (message->gnss_time_standard) {
+    case UAVCAN_EQUIPMENT_GNSS_FIX2_GNSS_TIME_STANDARD_UTC:
+        break;
+    case UAVCAN_EQUIPMENT_GNSS_FIX2_GNSS_TIME_STANDARD_TAI:
+        if (message->num_leap_seconds == 0) {
+            return false;
+        }
+        offset = (int)message->num_leap_seconds + 10;
+        break;
+    case UAVCAN_EQUIPMENT_GNSS_FIX2_GNSS_TIME_STANDARD_GPS:
+        if (message->num_leap_seconds == 0) {
+            return false;
+        }
+        offset = (int)message->num_leap_seconds - 9;
+        break;
+    default:
+        return false;
+    }
+    if (offset >= 0) {
+        uint64_t delta = (uint64_t)offset * UINT64_C(1000000);
+        if (raw <= delta) {
+            return false;
+        }
+        *utc_us = raw - delta;
+    } else {
+        *utc_us = raw + (uint64_t)(-offset) * UINT64_C(1000000);
+    }
+    return true;
 }
 
 /* 每条有效解码的 Fix2 都是候选，NO_FIX 也保留状态、卫星数和授时时标。 */
@@ -274,6 +323,16 @@ static void handle_gps(const CanardRxTransfer *transfer)
     ++stats.gps_messages;
     if (transfer->timestamp_usec < gps.reset_at) {
         return;
+    }
+    live_status.gps.sample_us = transfer->timestamp_usec;
+    live_status.gps.has_sample = true;
+    live_status.fix_status = message.status;
+    live_status.satellites = message.sats_used;
+    uint64_t utc;
+    if (gps_time_utc(&message, &utc)) {
+        live_status.utc_us = utc;
+        live_status.time_received_us = transfer->timestamp_usec;
+        live_status.has_time = true;
     }
     /* transfer 时间为首帧时间，received_us 仍是完成该传输的末帧时间。 */
     GpsSample sample = {
@@ -389,6 +448,15 @@ AcquisitionStats acquisition_stats(void)
     stats.gps_restarts = gps.restarts;
     stats.air_restarts = air.restarts;
     return stats;
+}
+
+AcquisitionStatus acquisition_status(void)
+{
+    live_status.gps.online = gps.online;
+    live_status.gps.heartbeat_us = gps.last_heartbeat;
+    live_status.air.online = air.online;
+    live_status.air.heartbeat_us = air.last_heartbeat;
+    return live_status;
 }
 
 void acquisition_stop(void)

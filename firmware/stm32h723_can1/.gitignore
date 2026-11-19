@@ -5,3 +5,9 @@
 /MDK-ARM/RTE/
 /test_can1_windows
 /test_can1_windows.exe
+/test_status_led
+/test_status_led.exe
+/test_acquisition_status
+/test_acquisition_status.exe
+/test_sd_led_status
+/test_sd_led_status.exe

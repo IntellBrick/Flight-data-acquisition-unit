@@ -21,6 +21,24 @@
 | USART1 | PA9 TX、PA10 RX，115200 8N1 |
 | SDMMC1 | PC8–PC11 数据、PC12 时钟、PD2 命令，四位轮询模式，正常卡时钟 12.5 MHz |
 
+## LED 状态指示
+
+逻辑 LED1 为 PA15（原理图 LED2），逻辑 LED2 为 PD15（原理图 LED3），均为低电平点亮。两灯在板级初始化早期常亮。
+
+| 灯 | 状态 | 灯光 |
+| --- | --- | --- |
+| LED1 | 任一传感器未就绪、数据过期、尚未成功写入数据、存储故障或已停止记录 | 常亮 |
+| LED1 | 两传感器就绪且当前文件已有成功数据写入，GPS 未达到 3D_FIX 或卫星数少于 6 | 2 Hz，亮 0.25 秒、灭 0.25 秒 |
+| LED1 | 两传感器就绪且当前文件已有成功数据写入，GPS 为 3D_FIX 且卫星数至少 6 | 0.5 Hz，亮 0.25 秒、灭 1.75 秒 |
+| LED2 | 未授时、连续 1 秒无有效授时，或 GPS 重启/掉线 | 常亮 |
+| LED2 | 有效授时后的 UTC 整分 00 秒 | 亮 0.5 秒一次 |
+| LED2 | 有效授时后的 UTC 半分 30 秒 | 亮 0.5 秒、灭 0.5 秒、再亮 0.5 秒 |
+| LED2 | 有效授时且当前没有报时脉冲 | 熄灭 |
+
+传感器就绪要求心跳在线、模式为 Operational，并且最近 1 秒内有解码成功的完整传感器报文。记录窗口已启动且当前文件的完整数据写入成功后，LED1 才开始闪烁。重新挂载时重新等待新文件首批数据写入。
+
+LED2 独立于搜星及写卡状态。UTC 时标直接使用，TAI/GPS 时标根据 Fix2 的闰秒字段换算，未知时标或换算所需闰秒未知时不刷新授时。初次授时、超时恢复、节点重启或大幅跳时后，从下一未来边界开始报时。时序由 1 ms SysTick 和本地单调时钟驱动，实际对时精度受 Fix2 报文发送与接收延迟影响。
+
 ## 日志导出
 
 从仓库根目录运行以下命令。可省略 `-o` 以输出到标准输出。序号缺口、CRC 错误与短尾报告写到标准错误。重挂载后创建新文件，同一次启动中的各文件共享时间轴和帧序号。
@@ -41,6 +59,22 @@ cc -std=c11 -DCANARD_ENABLE_DEADLINE=1 -IApp -ICore/Inc \
   tests/test_can1_windows.c App/acquisition.c App/log_record.c \
   ThirdParty/libcanard/canard.c ThirdParty/DSDL/src/*.c -o test_can1_windows
 ./test_can1_windows
+```
+
+LED 时序和状态集成测试可在本工程目录执行。
+
+```sh
+cc -std=c11 -IApp -ICore/Inc -IThirdParty/libcanard \
+  tests/test_status_led.c App/status_led.c -o test_status_led
+./test_status_led
+cc -std=c11 -DCANARD_ENABLE_DEADLINE=1 -IApp -ICore/Inc \
+  -IThirdParty/libcanard -IThirdParty/DSDL/include \
+  tests/test_acquisition_status.c App/acquisition.c App/log_record.c \
+  ThirdParty/libcanard/canard.c ThirdParty/DSDL/src/*.c -o test_acquisition_status
+./test_acquisition_status
+cc -std=c11 -IApp -ICore/Inc -IThirdParty/libcanard -IThirdParty/FatFs/source \
+  tests/test_sd_led_status.c App/sd_log.c App/log_record.c -o test_sd_led_status
+./test_sd_led_status
 ```
 
 ## 固定依赖
